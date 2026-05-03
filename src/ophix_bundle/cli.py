@@ -342,6 +342,45 @@ def run_inspect(args):
         print("  {:<60}  {}".format(m.name, file_kb))
 
 
+def run_install(args):
+    # type: (Any) -> None
+    archive = Path(args.archive)
+    if not archive.exists():
+        print("Error: archive not found: {}".format(archive), file=sys.stderr)
+        sys.exit(1)
+
+    out_dir = Path(args.output_dir)
+
+    try:
+        with tarfile.open(archive, "r:gz") as tar:
+            members = [m for m in tar.getmembers() if m.isfile() and m.name.startswith("packages/")]
+    except tarfile.TarError as exc:
+        print("Error: could not read archive: {}".format(exc), file=sys.stderr)
+        sys.exit(1)
+
+    if not members:
+        print("Error: archive contains no files under packages/", file=sys.stderr)
+        sys.exit(1)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    print("Archive:    {}".format(archive))
+    print("Output dir: {}".format(out_dir))
+    print("Extracting {} file(s)...\n".format(len(members)))
+
+    with tarfile.open(archive, "r:gz") as tar:
+        for m in sorted(members, key=lambda x: x.name):
+            filename = Path(m.name).name
+            dest = out_dir / filename
+            source = tar.extractfile(m)
+            if source is None:
+                continue
+            dest.write_bytes(source.read())
+            print("  {}".format(filename))
+
+    print("\nInstalled {} file(s) to {}".format(len(members), out_dir))
+
+
 def run_package(args):
     # type: (Any) -> None
     cfg = load_config()
@@ -533,6 +572,17 @@ COMMANDS = {
              "help": "Bundle name — show its contents (omit to list all bundles)"},
         ],
         "handler": run_list,
+    },
+
+    "install": {
+        "help": "Extract a packaged archive into a PyPI server packages directory",
+        "arguments": [
+            {"name": "archive", "metavar": "ARCHIVE",
+             "help": "Path to the .tgz archive to install"},
+            {"name": "--output-dir", "metavar": "DIR", "required": True, "dest": "output_dir",
+             "help": "Directory to extract package files into (e.g. the PyPI server packages directory)"},
+        ],
+        "handler": run_install,
     },
 
     "inspect": {

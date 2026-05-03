@@ -209,6 +209,34 @@ Archive:  ophix-core_20260503142305.tgz
 
 ---
 
+### `install`
+
+Extract a packaged archive directly into a PyPI server's packages directory on the target machine.
+
+```text
+ophix-bundle install <archive> --output-dir <dir>
+```
+
+| Argument / Option | Description |
+| --- | --- |
+| `archive` | Path to the `.tgz` archive to install |
+| `--output-dir <dir>` | Directory to extract package files into (the PyPI server's packages directory) |
+
+For **pypi-server**:
+
+```bash
+ophix-bundle install ophix-core_20260503142305.tgz --output-dir /srv/pypi/packages/
+```
+
+For **devpi** (extract first, then upload):
+
+```bash
+ophix-bundle install ophix-core_20260503142305.tgz --output-dir /tmp/ophix-install/
+devpi upload --from-dir /tmp/ophix-install/
+```
+
+---
+
 ### `package`
 
 Download all packages in a bundle from the configured PyPI server and produce a timestamped `.tgz` archive.
@@ -271,7 +299,13 @@ This is the typical setup when your local server holds only your own packages an
 
 ## Installing the archive on the target server
 
-Extract the archive and copy the package files into your local PyPI server's packages directory.
+If `ophix-bundle` is installed on the target machine, use the `install` command to extract directly into the PyPI server's packages directory:
+
+```bash
+ophix-bundle install ophix-core_20260503142305.tgz --output-dir /srv/pypi/packages/
+```
+
+Alternatively, use standard tools to extract and copy manually.
 
 For **pypi-server**:
 
