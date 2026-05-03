@@ -200,7 +200,7 @@ ophix-bundle package <name> [--server <url>] [--extra-index-url <url>] [--output
 | `--output-dir <dir>` | Write the archive to this directory (default: current directory) |
 | `--no-deps` | Download only the packages listed in the bundle; skip transitive dependencies |
 | `--allow-sdist` | Allow source distributions alongside wheels (default: wheels preferred; sdists require build tools on the target) |
-| `--exclude <pkgs>` | Comma-separated packages to skip — useful for packages with no wheels that are installed via the OS package manager on the target (e.g. `--exclude mysqlclient`) |
+| `--exclude <pkgs>` | Comma-separated packages to skip — useful for packages with no wheels that are installed via the OS package manager on the target (e.g. `--exclude mysqlclient`). Note: excluded packages are replaced with a stub that has no dependencies, so their transitive dependencies will not be downloaded either. Safe for leaf packages with no Python deps (e.g. C extensions like `mysqlclient`). |
 
 The archive is named `<bundle-name>_<YYYYMMDDHHMMSS>.tgz`. Running the command again on the same bundle produces a new archive with a new timestamp, pulling the latest version of any package whose bundle entry has no upper bound.
 
