@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ophix-bundle"
-version = "2026.05.03.05"
+version = "2026.05.03.06"
 description = "Bundle packages from a local PyPI server for air-gap deployment"
 readme = "README.md"
 requires-python = ">=3.10"

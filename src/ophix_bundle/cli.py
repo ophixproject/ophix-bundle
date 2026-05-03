@@ -318,6 +318,30 @@ def run_list(args):
             print("  {:<40}  {} package(s)".format(bf.stem, count))
 
 
+def run_inspect(args):
+    # type: (Any) -> None
+    archive = Path(args.archive)
+    if not archive.exists():
+        print("Error: archive not found: {}".format(archive), file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        with tarfile.open(archive, "r:gz") as tar:
+            members = [m for m in tar.getmembers() if m.isfile()]
+    except tarfile.TarError as exc:
+        print("Error: could not read archive: {}".format(exc), file=sys.stderr)
+        sys.exit(1)
+
+    total_bytes = sum(m.size for m in members)
+    size_str = "{} KB".format(total_bytes // 1024) if total_bytes < 1_048_576 else "{:.1f} MB".format(total_bytes / 1_048_576)
+
+    print("Archive:  {}".format(archive))
+    print("{} file(s)  (uncompressed {})\n".format(len(members), size_str))
+    for m in sorted(members, key=lambda x: x.name):
+        file_kb = "{} KB".format(m.size // 1024) if m.size < 1_048_576 else "{:.1f} MB".format(m.size / 1_048_576)
+        print("  {:<60}  {}".format(m.name, file_kb))
+
+
 def run_package(args):
     # type: (Any) -> None
     cfg = load_config()
@@ -509,6 +533,15 @@ COMMANDS = {
              "help": "Bundle name — show its contents (omit to list all bundles)"},
         ],
         "handler": run_list,
+    },
+
+    "inspect": {
+        "help": "List the contents of a packaged archive",
+        "arguments": [
+            {"name": "archive", "metavar": "ARCHIVE",
+             "help": "Path to the .tgz archive to inspect"},
+        ],
+        "handler": run_inspect,
     },
 
     "package": {

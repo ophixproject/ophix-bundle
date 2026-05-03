@@ -184,6 +184,31 @@ Bundle: ophix-core  (/home/user/ophix-bundles/ophix-core.txt)
 
 ---
 
+### `inspect`
+
+List the contents of a packaged archive.
+
+```text
+ophix-bundle inspect <archive>
+```
+
+| Argument | Description |
+| --- | --- |
+| `archive` | Path to the `.tgz` archive to inspect |
+
+```text
+$ ophix-bundle inspect ophix-core_20260503142305.tgz
+Archive:  ophix-core_20260503142305.tgz
+12 file(s)  (uncompressed 3.1 MB)
+
+  packages/ophix-creds-2026.04.23.01-py3-none-any.whl       142 KB
+  packages/ophix-docs-2026.04.23.01-py3-none-any.whl         38 KB
+  packages/ophix-server-base-2026.04.23.01-py3-none-any.whl  87 KB
+  ...
+```
+
+---
+
 ### `package`
 
 Download all packages in a bundle from the configured PyPI server and produce a timestamped `.tgz` archive.
