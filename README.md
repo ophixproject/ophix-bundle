@@ -88,8 +88,6 @@ ophix-bundle add --name <name> --packages <pkg1,pkg2,...> [--pin-version] [--ser
 | `--pin-version` | Query the server for the current latest version of each package and record it as a minimum constraint (`package>=X.Y.Z`) |
 | `--server <url>` | Override configured PyPI server URL (required when using `--pin-version` if no server is configured) |
 
-**Examples**
-
 Add packages without version pinning:
 
 ```bash
@@ -129,8 +127,6 @@ ophix-bundle update --name <name> [--add <pkgs>] [--remove <pkgs>] [--pin-versio
 | `--pin-version` | Pin added packages to their current latest version (>=) |
 | `--server <url>` | Override configured PyPI server URL |
 
-**Examples**
-
 Remove a package:
 
 ```bash
@@ -156,14 +152,12 @@ ophix-bundle update --name ophix-core --add ophix-theme-midnight --remove ophix-
 List all bundles in the configured bundles directory, or show the contents of a specific bundle.
 
 ```text
-ophix-bundle list [--name <name>]
+ophix-bundle list [<name>]
 ```
 
-| Option | Description |
+| Argument | Description |
 | --- | --- |
-| `--name <name>` | Show the contents of this bundle instead of listing all bundles |
-
-**Examples**
+| `name` | Bundle name — show its contents (omit to list all bundles) |
 
 List all bundles:
 
@@ -178,7 +172,7 @@ Bundles in /home/user/ophix-bundles:
 Show a specific bundle:
 
 ```text
-$ ophix-bundle list --name ophix-core
+$ ophix-bundle list ophix-core
 Bundle: ophix-core  (/home/user/ophix-bundles/ophix-core.txt)
 4 package(s):
 

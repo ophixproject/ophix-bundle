@@ -461,8 +461,8 @@ COMMANDS = {
     "list": {
         "help": "List all bundles, or show the contents of a named bundle",
         "arguments": [
-            {"name": "--name", "metavar": "NAME", "default": None,
-             "help": "Show contents of this specific bundle"},
+            {"name": "name", "nargs": "?", "metavar": "NAME", "default": None,
+             "help": "Bundle name — show its contents (omit to list all bundles)"},
         ],
         "handler": run_list,
     },
