@@ -67,6 +67,13 @@ def resolve_bundles_dir(cfg):
     return Path(stored) if stored else DEFAULT_BUNDLES_DIR
 
 
+def resolve_extra_indexes(cfg, override):
+    # type: (configparser.ConfigParser, Optional[List[str]]) -> List[str]
+    stored = cfg_get(cfg, "extra_index_url")
+    stored_list = [u.strip() for u in stored.split(",") if u.strip()] if stored else []
+    return stored_list + (override or [])
+
+
 # ---------------------------------------------------------------------------
 # Bundle file helpers
 # ---------------------------------------------------------------------------
@@ -112,15 +119,15 @@ def normalize_name(name):
 # PyPI helpers
 # ---------------------------------------------------------------------------
 
-def get_latest_version(package, server_url):
-    # type: (str, str) -> Optional[str]
+def get_latest_version(package, server_url, extra_indexes):
+    # type: (str, str, List[str]) -> Optional[str]
     """Return the latest version of a package from the configured PyPI server."""
     try:
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "index", "versions", package,
-             "--index-url", server_url, "--no-input"],
-            capture_output=True, text=True, timeout=30,
-        )
+        cmd = [sys.executable, "-m", "pip", "index", "versions", package,
+               "--index-url", server_url, "--no-input"]
+        for url in extra_indexes:
+            cmd.extend(["--extra-index-url", url])
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         # pip index versions first output line: "package-name (latest_version)"
         match = re.search(r"\(([^)]+)\)", result.stdout)
         if match:
@@ -134,8 +141,8 @@ def get_latest_version(package, server_url):
 # Shared add/update logic
 # ---------------------------------------------------------------------------
 
-def apply_adds(incoming, existing, pin_version, server):
-    # type: (List[str], List[str], bool, str) -> List[str]
+def apply_adds(incoming, existing, pin_version, server, extra_indexes):
+    # type: (List[str], List[str], bool, str, List[str]) -> List[str]
     """Merge incoming packages into existing list, updating in-place where names match."""
     by_name = {normalize_name(pkg_base_name(p)): i for i, p in enumerate(existing)}
     to_append = []  # type: List[str]
@@ -144,7 +151,7 @@ def apply_adds(incoming, existing, pin_version, server):
         entry = raw
         if pin_version:
             print("  Querying {} ...".format(raw), end=" ", flush=True)
-            ver = get_latest_version(raw, server)
+            ver = get_latest_version(raw, server, extra_indexes)
             if ver:
                 entry = "{}>={}".format(raw, ver)
                 print(">={}".format(ver))
@@ -186,18 +193,27 @@ def run_config(args):
         print("Bundles dir set to: {}".format(args.bundles_dir))
         changed = True
 
+    if args.extra_index_url:
+        joined = ",".join(args.extra_index_url)
+        cfg_set(cfg, "extra_index_url", joined)
+        print("Extra indexes set to: {}".format(joined))
+        changed = True
+
     if changed:
         save_config(cfg)
     else:
-        print("Config file:   {}".format(CONFIG_FILE))
-        print("Server:        {}".format(cfg_get(cfg, "server") or "(not set)"))
-        print("Bundles dir:   {}".format(resolve_bundles_dir(cfg)))
+        extra = cfg_get(cfg, "extra_index_url")
+        print("Config file:    {}".format(CONFIG_FILE))
+        print("Server:         {}".format(cfg_get(cfg, "server") or "(not set)"))
+        print("Extra indexes:  {}".format(extra or "(not set)"))
+        print("Bundles dir:    {}".format(resolve_bundles_dir(cfg)))
 
 
 def run_add(args):
     # type: (Any) -> None
     cfg = load_config()
     server = resolve_server(cfg, args.server)
+    extra_indexes = resolve_extra_indexes(cfg, args.extra_index_url)
     bundles_dir = resolve_bundles_dir(cfg)
 
     if args.pin_version and not server:
@@ -207,7 +223,7 @@ def run_add(args):
 
     incoming = [p.strip() for p in args.packages.split(",") if p.strip()]
     existing = read_bundle(args.name, bundles_dir)
-    result = apply_adds(incoming, existing, args.pin_version, server)
+    result = apply_adds(incoming, existing, args.pin_version, server, extra_indexes)
     write_bundle(args.name, bundles_dir, result)
     print("\nBundle saved: {}".format(bundle_path(args.name, bundles_dir)))
 
@@ -216,6 +232,7 @@ def run_update(args):
     # type: (Any) -> None
     cfg = load_config()
     server = resolve_server(cfg, args.server)
+    extra_indexes = resolve_extra_indexes(cfg, args.extra_index_url)
     bundles_dir = resolve_bundles_dir(cfg)
     bp = bundle_path(args.name, bundles_dir)
 
@@ -243,7 +260,7 @@ def run_update(args):
 
     if args.add:
         incoming = [p.strip() for p in args.add.split(",") if p.strip()]
-        existing = apply_adds(incoming, existing, args.pin_version, server)
+        existing = apply_adds(incoming, existing, args.pin_version, server, extra_indexes)
 
     write_bundle(args.name, bundles_dir, existing)
     print("\nBundle saved: {}".format(bp))
@@ -390,11 +407,14 @@ def build_parser(prog, version, commands, description=None):
 
 COMMANDS = {
     "config": {
-        "help": "Show or update tool configuration (server URL, bundles directory)",
+        "help": "Show or update tool configuration (server URL, extra indexes, bundles directory)",
         "arguments": [
-            {"name": "--server",      "metavar": "URL",  "default": None,
+            {"name": "--server",          "metavar": "URL", "default": None,
              "help": "Store this PyPI server URL as the default"},
-            {"name": "--bundles-dir", "metavar": "DIR",  "default": None, "dest": "bundles_dir",
+            {"name": "--extra-index-url", "metavar": "URL", "default": None,
+             "dest": "extra_index_url",   "action": "append",
+             "help": "Store an additional index URL (repeatable; replaces any previously stored list)"},
+            {"name": "--bundles-dir",     "metavar": "DIR", "default": None, "dest": "bundles_dir",
              "help": "Store this path as the default bundles directory"},
         ],
         "handler": run_config,
@@ -403,14 +423,17 @@ COMMANDS = {
     "add": {
         "help": "Add packages to a bundle (creates the bundle file if it does not exist)",
         "arguments": [
-            {"name": "--name",        "required": True,  "metavar": "NAME",
+            {"name": "--name",            "required": True, "metavar": "NAME",
              "help": "Bundle name"},
-            {"name": "--packages",    "required": True,  "metavar": "PKGS",
+            {"name": "--packages",        "required": True, "metavar": "PKGS",
              "help": "Comma-separated package names to add"},
-            {"name": "--pin-version", "action": "store_true", "dest": "pin_version",
+            {"name": "--pin-version",     "action": "store_true", "dest": "pin_version",
              "help": "Query server for latest version and record as minimum (>=)"},
-            {"name": "--server",      "metavar": "URL",  "default": None,
+            {"name": "--server",          "metavar": "URL", "default": None,
              "help": "Override configured PyPI server URL (required with --pin-version)"},
+            {"name": "--extra-index-url", "metavar": "URL", "default": None,
+             "dest": "extra_index_url",   "action": "append",
+             "help": "Additional index to search when querying versions (repeatable; adds to configured list)"},
         ],
         "handler": run_add,
     },
@@ -418,16 +441,19 @@ COMMANDS = {
     "update": {
         "help": "Add or remove packages in an existing bundle",
         "arguments": [
-            {"name": "--name",        "required": True,  "metavar": "NAME",
+            {"name": "--name",            "required": True, "metavar": "NAME",
              "help": "Bundle name"},
-            {"name": "--add",         "metavar": "PKGS", "default": None,
+            {"name": "--add",             "metavar": "PKGS", "default": None,
              "help": "Comma-separated packages to add"},
-            {"name": "--remove",      "metavar": "PKGS", "default": None,
+            {"name": "--remove",          "metavar": "PKGS", "default": None,
              "help": "Comma-separated packages to remove (version specifiers ignored)"},
-            {"name": "--pin-version", "action": "store_true", "dest": "pin_version",
+            {"name": "--pin-version",     "action": "store_true", "dest": "pin_version",
              "help": "Pin added packages to current latest version (>=)"},
-            {"name": "--server",      "metavar": "URL",  "default": None,
+            {"name": "--server",          "metavar": "URL", "default": None,
              "help": "Override configured PyPI server URL"},
+            {"name": "--extra-index-url", "metavar": "URL", "default": None,
+             "dest": "extra_index_url",   "action": "append",
+             "help": "Additional index to search when querying versions (repeatable; adds to configured list)"},
         ],
         "handler": run_update,
     },
