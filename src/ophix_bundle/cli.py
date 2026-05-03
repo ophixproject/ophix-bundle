@@ -470,7 +470,7 @@ COMMANDS = {
     "package": {
         "help": "Download a bundle from the PyPI server and create a distributable archive",
         "arguments": [
-            {"name": "--name",            "required": True,  "metavar": "NAME",
+            {"name": "name", "metavar": "NAME",
              "help": "Bundle name"},
             {"name": "--server",          "metavar": "URL",  "default": None,
              "help": "Override configured PyPI server URL"},

@@ -189,12 +189,12 @@ Bundle: ophix-core  (/home/user/ophix-bundles/ophix-core.txt)
 Download all packages in a bundle from the configured PyPI server and produce a timestamped `.tgz` archive.
 
 ```text
-ophix-bundle package --name <name> [--server <url>] [--extra-index-url <url>] [--output-dir <dir>] [--no-deps]
+ophix-bundle package <name> [--server <url>] [--extra-index-url <url>] [--output-dir <dir>] [--no-deps]
 ```
 
-| Option | Description |
+| Argument / Option | Description |
 | --- | --- |
-| `--name <name>` | Bundle name |
+| `name` | Bundle name |
 | `--server <url>` | Override configured PyPI server URL |
 | `--extra-index-url <url>` | Additional index to search when resolving dependencies (repeatable) |
 | `--output-dir <dir>` | Write the archive to this directory (default: current directory) |
@@ -213,7 +213,7 @@ ophix-core_20260503142305.tgz
       └── ...
 ```
 
-**Example**
+#### Example
 
 ```text
 $ ophix-bundle package --name ophix-core
