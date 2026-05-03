@@ -301,8 +301,12 @@ def run_package(args):
     out_dir = Path(args.output_dir) if args.output_dir else Path.cwd()
     archive_path = out_dir / archive_name
 
+    extra_indexes = args.extra_index_url or []
+
     print("Bundle:     {} ({} package spec(s))".format(args.name, len(lines)))
     print("Server:     {}".format(server))
+    for url in extra_indexes:
+        print("Extra idx:  {}".format(url))
     print("Output:     {}".format(archive_path))
     print("Deps:       {}".format("excluded" if args.no_deps else "included"))
     print()
@@ -318,6 +322,8 @@ def run_package(args):
             "--no-input",
             "-r", str(bp),
         ]
+        for url in extra_indexes:
+            pip_cmd.extend(["--extra-index-url", url])
         if args.no_deps:
             pip_cmd.append("--no-deps")
 
@@ -438,13 +444,17 @@ COMMANDS = {
     "package": {
         "help": "Download a bundle from the PyPI server and create a distributable archive",
         "arguments": [
-            {"name": "--name",       "required": True,  "metavar": "NAME",
+            {"name": "--name",            "required": True,  "metavar": "NAME",
              "help": "Bundle name"},
-            {"name": "--server",     "metavar": "URL",  "default": None,
+            {"name": "--server",          "metavar": "URL",  "default": None,
              "help": "Override configured PyPI server URL"},
-            {"name": "--output-dir", "metavar": "DIR",  "default": None, "dest": "output_dir",
+            {"name": "--extra-index-url", "metavar": "URL",  "default": None,
+             "dest": "extra_index_url",   "action": "append",
+             "help": "Additional index to search for dependencies (repeatable); "
+                     "use https://pypi.org/simple/ to pull public deps"},
+            {"name": "--output-dir",      "metavar": "DIR",  "default": None, "dest": "output_dir",
              "help": "Directory for the output archive (default: current directory)"},
-            {"name": "--no-deps",    "action": "store_true", "dest": "no_deps",
+            {"name": "--no-deps",         "action": "store_true", "dest": "no_deps",
              "help": "Download only the listed packages, skip transitive dependencies"},
         ],
         "handler": run_package,
