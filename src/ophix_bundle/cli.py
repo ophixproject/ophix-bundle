@@ -319,6 +319,11 @@ def run_package(args):
     archive_path = out_dir / archive_name
 
     extra_indexes = args.extra_index_url or []
+    excludes = {normalize_name(p.strip()) for p in args.exclude.split(",") if p.strip()} if args.exclude else set()
+
+    # Filter the bundle lines, dropping any package whose base name is in the exclude set
+    effective_lines = [l for l in lines if normalize_name(pkg_base_name(l)) not in excludes]
+    skipped = len(lines) - len(effective_lines)
 
     print("Bundle:     {} ({} package spec(s))".format(args.name, len(lines)))
     print("Server:     {}".format(server))
@@ -327,18 +332,24 @@ def run_package(args):
     print("Output:     {}".format(archive_path))
     print("Deps:       {}".format("excluded" if args.no_deps else "included"))
     print("Wheels:     {}".format("wheels and sdists" if args.allow_sdist else "preferred (--prefer-binary)"))
+    if skipped:
+        print("Excluded:   {}".format(args.exclude))
     print()
 
     with tempfile.TemporaryDirectory() as tmpdir:
         dl_dir = Path(tmpdir) / "packages"
         dl_dir.mkdir()
 
+        # Write a filtered requirements file so pip never sees the excluded packages
+        filtered_req = Path(tmpdir) / "requirements.txt"
+        filtered_req.write_text("\n".join(effective_lines) + "\n", encoding="utf-8")
+
         pip_cmd = [
             sys.executable, "-m", "pip", "download",
             "--index-url", server,
             "--dest", str(dl_dir),
             "--no-input",
-            "-r", str(bp),
+            "-r", str(filtered_req),
         ]
         for url in extra_indexes:
             pip_cmd.extend(["--extra-index-url", url])
@@ -488,6 +499,9 @@ COMMANDS = {
             {"name": "--allow-sdist",     "action": "store_true", "dest": "allow_sdist",
              "help": "Allow source distributions in addition to wheels "
                      "(default: wheels preferred; sdists require build tools on the target)"},
+            {"name": "--exclude",         "metavar": "PKGS",     "default": None,
+             "help": "Comma-separated packages to skip (e.g. packages with no wheels that are "
+                     "installed via the OS package manager on the target)"},
         ],
         "handler": run_package,
     },
