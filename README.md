@@ -189,7 +189,7 @@ Bundle: ophix-core  (/home/user/ophix-bundles/ophix-core.txt)
 Download all packages in a bundle from the configured PyPI server and produce a timestamped `.tgz` archive.
 
 ```text
-ophix-bundle package <name> [--server <url>] [--extra-index-url <url>] [--output-dir <dir>] [--no-deps]
+ophix-bundle package <name> [--server <url>] [--extra-index-url <url>] [--output-dir <dir>] [--no-deps] [--allow-sdist]
 ```
 
 | Argument / Option | Description |
@@ -199,6 +199,7 @@ ophix-bundle package <name> [--server <url>] [--extra-index-url <url>] [--output
 | `--extra-index-url <url>` | Additional index to search when resolving dependencies (repeatable) |
 | `--output-dir <dir>` | Write the archive to this directory (default: current directory) |
 | `--no-deps` | Download only the packages listed in the bundle; skip transitive dependencies |
+| `--allow-sdist` | Allow source distributions alongside wheels (default: wheels preferred; sdists require build tools on the target) |
 
 The archive is named `<bundle-name>_<YYYYMMDDHHMMSS>.tgz`. Running the command again on the same bundle produces a new archive with a new timestamp, pulling the latest version of any package whose bundle entry has no upper bound.
 

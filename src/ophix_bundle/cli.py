@@ -326,6 +326,7 @@ def run_package(args):
         print("Extra idx:  {}".format(url))
     print("Output:     {}".format(archive_path))
     print("Deps:       {}".format("excluded" if args.no_deps else "included"))
+    print("Wheels:     {}".format("wheels and sdists" if args.allow_sdist else "preferred (--prefer-binary)"))
     print()
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -341,6 +342,8 @@ def run_package(args):
         ]
         for url in extra_indexes:
             pip_cmd.extend(["--extra-index-url", url])
+        if not args.allow_sdist:
+            pip_cmd.append("--prefer-binary")
         if args.no_deps:
             pip_cmd.append("--no-deps")
 
@@ -482,6 +485,9 @@ COMMANDS = {
              "help": "Directory for the output archive (default: current directory)"},
             {"name": "--no-deps",         "action": "store_true", "dest": "no_deps",
              "help": "Download only the listed packages, skip transitive dependencies"},
+            {"name": "--allow-sdist",     "action": "store_true", "dest": "allow_sdist",
+             "help": "Allow source distributions in addition to wheels "
+                     "(default: wheels preferred; sdists require build tools on the target)"},
         ],
         "handler": run_package,
     },
