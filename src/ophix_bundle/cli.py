@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Mapping, Optional
@@ -175,6 +176,31 @@ def apply_adds(incoming, existing, pin_version, server, extra_indexes):
 
 
 # ---------------------------------------------------------------------------
+# Stub wheel helpers (used to satisfy excluded transitive dependencies)
+# ---------------------------------------------------------------------------
+
+def _stub_wheel_name(package_name):
+    # type: (str) -> str
+    return "{}-9999.0.0-py3-none-any.whl".format(package_name.replace("-", "_"))
+
+
+def _create_stub_wheel(package_name, dest_dir):
+    # type: (str, Path) -> None
+    """Create a minimal valid wheel so pip satisfies the dep without building from source.
+    The stub is never included in the final archive."""
+    norm = package_name.replace("-", "_")
+    dist_info = "{}-9999.0.0.dist-info".format(norm)
+    wheel_path = dest_dir / _stub_wheel_name(package_name)
+    with zipfile.ZipFile(str(wheel_path), "w") as zf:
+        zf.writestr("{}/WHEEL".format(dist_info),
+                    "Wheel-Version: 1.0\nGenerator: ophix-bundle\n"
+                    "Root-Is-Purelib: true\nTag: py3-none-any\n")
+        zf.writestr("{}/METADATA".format(dist_info),
+                    "Metadata-Version: 2.1\nName: {}\nVersion: 9999.0.0\n".format(package_name))
+        zf.writestr("{}/RECORD".format(dist_info), "")
+
+
+# ---------------------------------------------------------------------------
 # CLI command implementations
 # ---------------------------------------------------------------------------
 
@@ -321,10 +347,6 @@ def run_package(args):
     extra_indexes = args.extra_index_url or []
     excludes = {normalize_name(p.strip()) for p in args.exclude.split(",") if p.strip()} if args.exclude else set()
 
-    # Filter the bundle lines, dropping any package whose base name is in the exclude set
-    effective_lines = [l for l in lines if normalize_name(pkg_base_name(l)) not in excludes]
-    skipped = len(lines) - len(effective_lines)
-
     print("Bundle:     {} ({} package spec(s))".format(args.name, len(lines)))
     print("Server:     {}".format(server))
     for url in extra_indexes:
@@ -332,27 +354,34 @@ def run_package(args):
     print("Output:     {}".format(archive_path))
     print("Deps:       {}".format("excluded" if args.no_deps else "included"))
     print("Wheels:     {}".format("wheels and sdists" if args.allow_sdist else "preferred (--prefer-binary)"))
-    if skipped:
-        print("Excluded:   {}".format(args.exclude))
+    if excludes:
+        print("Excluded:   {}".format(", ".join(sorted(excludes))))
     print()
 
     with tempfile.TemporaryDirectory() as tmpdir:
         dl_dir = Path(tmpdir) / "packages"
         dl_dir.mkdir()
 
-        # Write a filtered requirements file so pip never sees the excluded packages
-        filtered_req = Path(tmpdir) / "requirements.txt"
-        filtered_req.write_text("\n".join(effective_lines) + "\n", encoding="utf-8")
-
         pip_cmd = [
             sys.executable, "-m", "pip", "download",
             "--index-url", server,
             "--dest", str(dl_dir),
             "--no-input",
-            "-r", str(filtered_req),
+            "-r", str(bp),
         ]
         for url in extra_indexes:
             pip_cmd.extend(["--extra-index-url", url])
+
+        if excludes:
+            # Create a stub wheel for each excluded package so pip can satisfy transitive
+            # dependencies without attempting a source build. Stubs are written to a
+            # separate directory and filtered out of the archive after download.
+            stubs_dir = Path(tmpdir) / "stubs"
+            stubs_dir.mkdir()
+            for pkg in excludes:
+                _create_stub_wheel(pkg, stubs_dir)
+            pip_cmd.extend(["--find-links", str(stubs_dir)])
+
         if not args.allow_sdist:
             pip_cmd.append("--prefer-binary")
         if args.no_deps:
@@ -364,7 +393,8 @@ def run_package(args):
             print("\nError: pip download failed.", file=sys.stderr)
             sys.exit(1)
 
-        downloaded = sorted(dl_dir.iterdir())
+        stub_filenames = {_stub_wheel_name(p) for p in excludes}
+        downloaded = [f for f in sorted(dl_dir.iterdir()) if f.name not in stub_filenames]
         print("\nDownloaded {} file(s). Creating archive...".format(len(downloaded)))
 
         out_dir.mkdir(parents=True, exist_ok=True)
